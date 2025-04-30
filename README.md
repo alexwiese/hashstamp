@@ -4,7 +4,8 @@ HashStamp is an incremental source generator built for .NET projects. It leverag
 
 ## Features
 
-- Generates a class called `HashStamps` that contains properties that capture the hash value of each method's source code body.
+- Automatically generates a `HashStamps` class containing properties that represent the hash values of each method's source code body.
+- Supports both compile-time access and dynamic lookup of method hashes.
 
 ## Getting Started
 
@@ -38,9 +39,17 @@ Console.WriteLine(HashStamps.Namespaces["HashStamp.Test"].Classes["TestClass1"].
 
 Clone the repository and build the solution:
 
+```
+dotnet build
+```
+
 ### Testing
 
 Run the tests to ensure everything is working as expected:
+
+```
+dotnet test
+```
 
 ## Contributing
 
