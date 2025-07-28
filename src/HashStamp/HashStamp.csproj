@@ -11,6 +11,8 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
     <ROSLYN_VERSION Condition="'$(ROSLYN_VERSION)' == ''">4.13</ROSLYN_VERSION>
+
+    <Configurations>Debug;Release;Debug Source Generator</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

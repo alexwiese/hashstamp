@@ -1,5 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-using HashStamp.Test;
+﻿using HashStamp.Test;
 using HashStamp;
 
 Console.WriteLine("Hello, World!");
@@ -8,6 +7,7 @@ new TestClass1().TestMethod2();
 
 Console.WriteLine(HashStamps.HashStamp_Test.TestClass1.TestMethod1);
 Console.WriteLine(HashStamps.HashStamp_Test.TestClass1.TestMethod2);
+Console.WriteLine(HashStamps.HashStamp_Test.TestClass1.TestMethod3_String);
 Console.WriteLine(HashStamps.HashStamp_Test.TestClass1.TestMethod3);
 Console.WriteLine(HashStamps.HashStamp_Test.TestClass2.TestMethod3);
 Console.WriteLine(HashStamps.HashStamp_Test_OtherNamespace.TestClass2.TestMethod3);

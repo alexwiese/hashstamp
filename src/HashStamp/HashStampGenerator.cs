@@ -3,10 +3,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace HashStamp;
 
@@ -16,7 +17,7 @@ public class HashStampGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
 #if DEBUG_SOURCE_GENERATOR
-        DebuggerUtil.AttachDebugger();
+        System.Diagnostics.Debugger.Launch();
 #endif
 
         var methodDeclarations = context.SyntaxProvider
@@ -28,14 +29,6 @@ public class HashStampGenerator : IIncrementalGenerator
         var source = context.CompilationProvider.Combine(methodDeclarations.Collect());
 
         context.RegisterSourceOutput(source, static (ctx, source) => Execute(source.Left, source.Right, ctx));
-    }
-
-    private class MethodHashInfo(string @namespace, string className, string name, string hash)
-    {
-        public string Namespace { get; } = @namespace;
-        public string ClassName { get; } = className;
-        public string Name { get; } = name;
-        public string Hash { get; } = hash;
     }
 
     private static void Execute(Compilation compilation, ImmutableArray<MethodDeclarationSyntax> methods, SourceProductionContext context)
@@ -51,24 +44,58 @@ public class HashStampGenerator : IIncrementalGenerator
                 continue;
 
             // Get the source code of the method's body, without the signature
-            var methodBody = method.Body?.ToFullString() ?? string.Empty;
+            // For expression-bodied methods we need to use the ExpressionBody
+            var methodBody = method.Body?.ToFullString()
+                ?? method.ExpressionBody?.ToFullString()
+                ?? string.Empty;
 
             var hash = CalculateHash(methodBody);
 
-            methodHashes.Add(new(methodSymbol.ContainingNamespace.ToDisplayString(), methodSymbol.ContainingType.Name, methodSymbol.Name, hash));
+            methodHashes.Add(new(
+                @namespace: methodSymbol.ContainingNamespace.ToDisplayString(),
+                className: methodSymbol.ContainingType.Name,
+                name: methodSymbol.ToDisplayString(new SymbolDisplayFormat()),
+                qualifiedName: methodSymbol.ToDisplayString(new SymbolDisplayFormat(
+                    memberOptions: SymbolDisplayMemberOptions.IncludeParameters,
+                    parameterOptions: SymbolDisplayParameterOptions.IncludeType)),
+                hash: hash));
         }
 
         context.AddSource($"HashStamps.g.cs", GenerateHashStamps(methodHashes));
-
     }
 
     private static string GenerateHashStamps(List<MethodHashInfo> methodHashes)
     {
         static string GenerateNamespace(string @namespace, List<MethodHashInfo> methods)
         {
+            static IEnumerable<MethodHashInfo> GetQualifiedHashes(IEnumerable<MethodHashInfo> methodHashes)
+            {
+                var methodsWithCollidingName = methodHashes
+                  .GroupBy(m => m.Name)
+                  .Where(g => g.Count() > 1)
+                  .Select(g => g.Key)
+                  .ToImmutableHashSet();
+
+                string GetMethodName(MethodHashInfo methodHashInfo)
+                    => methodsWithCollidingName.Contains(methodHashInfo.Name)
+                        ? methodHashInfo.QualifiedName
+                        : methodHashInfo.Name;
+
+                foreach (var methodHash in methodHashes)
+                {
+                    yield return new MethodHashInfo(
+                        @namespace: methodHash.Namespace,
+                        className: methodHash.ClassName,
+                        name: GetMethodName(methodHash),
+                        hash: methodHash.Hash,
+                        qualifiedName: methodHash.QualifiedName);
+                }
+            }
+
+
             var classConsts = methods
                 .GroupBy(m => m.ClassName)
-                .Select(m => GenerateClass(m.Key, m.ToList()))
+                .Select(m => GenerateClass(m.Key, [.. GetQualifiedHashes(m)]))
                 .ToList();
 
             return $@"
@@ -95,7 +122,7 @@ public class HashStampGenerator : IIncrementalGenerator
 
         var classes = methodHashes
             .GroupBy(m => m.Namespace)
-            .Select(g => GenerateNamespace(g.Key, g.ToList()))
+            .Select(g => GenerateNamespace(g.Key, [.. g]))
             .ToList();
 
         return $@"
@@ -134,11 +161,25 @@ public class HashStampGenerator : IIncrementalGenerator
         ";
     }
 
+    /// <summary>
+    /// Calculates a SHA-256 hash of the provided source string and returns it as a lowercase hexadecimal string.
+    /// </summary>
+    /// <param name="source">The input string to hash.</param>
+    /// <returns>The SHA-256 hash of the input as a lowercase hexadecimal string.</returns>
     private static string CalculateHash(string source)
     {
         using var sha256 = SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(source);
         var hash = sha256.ComputeHash(bytes);
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+    }
+
+    private class MethodHashInfo(string @namespace, string className, string name, string hash, string qualifiedName)
+    {
+        public string Namespace { get; } = @namespace;
+        public string ClassName { get; } = className;
+        public string Name { get; } = name;
+        public string Hash { get; } = hash;
+        public string QualifiedName { get; } = Regex.Replace(qualifiedName, @"[\(\)\.]", "_").TrimEnd("_").ToString();
     }
 }

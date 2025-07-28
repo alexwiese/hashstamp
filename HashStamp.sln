@@ -8,14 +8,19 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HashStamp.Test", "src\HashS
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug Source Generator|Any CPU = Debug Source Generator|Any CPU
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B0A8CDD9-AEFC-4733-84F6-1EEFE1160886}.Debug Source Generator|Any CPU.ActiveCfg = Debug Source Generator|Any CPU
+		{B0A8CDD9-AEFC-4733-84F6-1EEFE1160886}.Debug Source Generator|Any CPU.Build.0 = Debug Source Generator|Any CPU
 		{B0A8CDD9-AEFC-4733-84F6-1EEFE1160886}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B0A8CDD9-AEFC-4733-84F6-1EEFE1160886}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B0A8CDD9-AEFC-4733-84F6-1EEFE1160886}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B0A8CDD9-AEFC-4733-84F6-1EEFE1160886}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B30806B3-A760-4C31-9B70-1435C0784531}.Debug Source Generator|Any CPU.ActiveCfg = Debug Source Generator|Any CPU
+		{B30806B3-A760-4C31-9B70-1435C0784531}.Debug Source Generator|Any CPU.Build.0 = Debug Source Generator|Any CPU
 		{B30806B3-A760-4C31-9B70-1435C0784531}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B30806B3-A760-4C31-9B70-1435C0784531}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B30806B3-A760-4C31-9B70-1435C0784531}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -16,5 +16,10 @@
         {
             return "Hello, World 3!";
         }
+
+        public string TestMethod3(string value)
+        {
+            return "Hello, World 3!";
+        }
     }
 }
