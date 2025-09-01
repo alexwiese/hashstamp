@@ -403,3 +403,5 @@ FodyWeavers.xsd
 *_output.txt
 *_timing.txt
 performance_report.md
+*_benchmark.txt
+*_results.txt
