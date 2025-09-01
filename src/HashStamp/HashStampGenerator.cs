@@ -177,16 +177,25 @@ public class HashStampGenerator : IIncrementalGenerator
         using var sha256 = SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(source);
         var hash = sha256.ComputeHash(bytes);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+
+        // Optimize string conversion to avoid multiple string allocations
+        var result = new StringBuilder(hash.Length * 2);
+        foreach (var b in hash)
+        {
+            result.Append(b.ToString("x2"));
+        }
+        return result.ToString();
     }
 
     private class MethodHashInfo(string @namespace, string className, string name, string hash, string qualifiedName, string signature)
     {
+        private static readonly Regex QualifiedNameRegex = new(@"[\(\)\.]", RegexOptions.Compiled);
+
         public string Namespace { get; } = @namespace;
         public string ClassName { get; } = className;
         public string Name { get; } = name;
         public string Hash { get; } = hash;
-        public string QualifiedName { get; } = Regex.Replace(qualifiedName, @"[\(\)\.]", "_").TrimEnd('_');
+        public string QualifiedName { get; } = QualifiedNameRegex.Replace(qualifiedName, "_").TrimEnd('_');
         public string Signature { get; } = signature;
     }
 }
