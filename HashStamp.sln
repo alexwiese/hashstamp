@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HashStamp", "src\HashStamp\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HashStamp.Test", "src\HashStamp.Test\HashStamp.Test.csproj", "{B30806B3-A760-4C31-9B70-1435C0784531}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HashStamp.UnitTests", "src\HashStamp.UnitTests\HashStamp.UnitTests.csproj", "{C30806B3-A760-4C31-9B70-1435C0784532}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HashStamp.Benchmarks", "src\HashStamp.Benchmarks\HashStamp.Benchmarks.csproj", "{D30806B3-A760-4C31-9B70-1435C0784533}"
 EndProject
 Global

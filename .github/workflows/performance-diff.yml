@@ -24,30 +24,21 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     
-    # Build and test current branch (PR)
-    - name: Build current branch
+    # Build and benchmark current branch (PR)
+    - name: Build and benchmark current branch
       run: |
         echo "Building PR branch..."
         dotnet build --configuration Release --no-restore
-        echo "Running test application..."
-        time -p dotnet run --project src/HashStamp.Test/HashStamp.Test.csproj --no-build --configuration Release > pr_output.txt 2> pr_timing.txt
+        echo "Running benchmarks..."
+        dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release --no-build -- --quick 2>&1 | tee pr_benchmark.txt
     
-    - name: Collect PR metrics
+    - name: Collect PR benchmark results
       run: |
-        echo "=== PR Branch Metrics ===" > performance_report.md
+        echo "=== PR Branch Benchmark Results ===" > performance_report.md
         echo "" >> performance_report.md
-        echo "**Build Output:**" >> performance_report.md
+        echo "**Benchmark Output:**" >> performance_report.md
         echo "\`\`\`" >> performance_report.md
-        cat pr_output.txt >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        echo "" >> performance_report.md
-        echo "**Timing Information:**" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        if [ -s pr_timing.txt ]; then
-          cat pr_timing.txt >> performance_report.md
-        else
-          echo "No timing information captured" >> performance_report.md
-        fi
+        cat pr_benchmark.txt | grep -A 20 "| Method\|Mean\|Error\|StdDev\|Ratio" >> performance_report.md
         echo "\`\`\`" >> performance_report.md
         echo "" >> performance_report.md
         
@@ -56,7 +47,7 @@ jobs:
         echo "\`\`\`" >> performance_report.md
         echo "PR Branch:" >> performance_report.md
         ls -la src/HashStamp/bin/Release/netstandard2.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
-        ls -la src/HashStamp.Test/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
+        ls -la src/HashStamp.Benchmarks/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
         echo "\`\`\`" >> performance_report.md
     
     # Checkout base branch and build for comparison
@@ -65,30 +56,21 @@ jobs:
         git checkout ${{ github.event.pull_request.base.sha }}
         dotnet restore
     
-    - name: Build base branch
+    - name: Build and benchmark base branch
       run: |
         echo "Building base branch..."
         dotnet build --configuration Release --no-restore
-        echo "Running test application..."
-        time -p dotnet run --project src/HashStamp.Test/HashStamp.Test.csproj --no-build --configuration Release > base_output.txt 2> base_timing.txt
+        echo "Running benchmarks..."
+        dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release --no-build -- --quick 2>&1 | tee base_benchmark.txt
     
-    - name: Collect base metrics and generate comparison
+    - name: Collect base benchmark results and generate comparison
       run: |
         echo "" >> performance_report.md
-        echo "=== Base Branch Metrics ===" >> performance_report.md
+        echo "=== Base Branch Benchmark Results ===" >> performance_report.md
         echo "" >> performance_report.md
-        echo "**Build Output:**" >> performance_report.md
+        echo "**Benchmark Output:**" >> performance_report.md
         echo "\`\`\`" >> performance_report.md
-        cat base_output.txt >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        echo "" >> performance_report.md
-        echo "**Timing Information:**" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        if [ -s base_timing.txt ]; then
-          cat base_timing.txt >> performance_report.md
-        else
-          echo "No timing information captured" >> performance_report.md
-        fi
+        cat base_benchmark.txt | grep -A 20 "| Method\|Mean\|Error\|StdDev\|Ratio" >> performance_report.md
         echo "\`\`\`" >> performance_report.md
         echo "" >> performance_report.md
         
@@ -97,31 +79,27 @@ jobs:
         echo "\`\`\`" >> performance_report.md
         echo "Base Branch:" >> performance_report.md
         ls -la src/HashStamp/bin/Release/netstandard2.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
-        ls -la src/HashStamp.Test/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
+        ls -la src/HashStamp.Benchmarks/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
         echo "\`\`\`" >> performance_report.md
         
         # Add comparison summary
         echo "" >> performance_report.md
-        echo "=== Summary ===" >> performance_report.md
+        echo "=== Performance Analysis ===" >> performance_report.md
         echo "" >> performance_report.md
-        echo "This performance report compares the PR branch against the base branch." >> performance_report.md
-        echo "Key areas to review:" >> performance_report.md
-        echo "- Build output differences (especially hash values)" >> performance_report.md
+        echo "This report compares benchmark performance between the PR and base branches." >> performance_report.md
+        echo "" >> performance_report.md
+        echo "**Key metrics to review:**" >> performance_report.md
+        echo "- Compile-time hash access performance" >> performance_report.md
+        echo "- Runtime hash lookup performance" >> performance_report.md  
+        echo "- Memory allocation differences" >> performance_report.md
         echo "- Assembly size changes" >> performance_report.md
-        echo "- Runtime performance" >> performance_report.md
         echo "" >> performance_report.md
         
-        # Check if outputs are different
-        if diff -q pr_output.txt base_output.txt > /dev/null; then
-          echo "✅ **Output is identical between branches**" >> performance_report.md
-        else
-          echo "⚠️ **Output differs between branches**" >> performance_report.md
-          echo "" >> performance_report.md
-          echo "**Differences:**" >> performance_report.md
-          echo "\`\`\`diff" >> performance_report.md
-          diff pr_output.txt base_output.txt >> performance_report.md || true
-          echo "\`\`\`" >> performance_report.md
-        fi
+        # Check for significant performance changes
+        echo "**Analysis Notes:**" >> performance_report.md
+        echo "- Ratios > 1.1x indicate potential performance regression" >> performance_report.md
+        echo "- Ratios < 0.9x indicate potential performance improvement" >> performance_report.md
+        echo "- Memory allocation changes should be investigated" >> performance_report.md
     
     - name: Comment PR
       uses: actions/github-script@v7
@@ -134,5 +112,5 @@ jobs:
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: `## 📊 Performance Diff Report\n\n${report}`
+            body: `## ⚡ Performance Benchmark Report\n\n${report}`
           });
