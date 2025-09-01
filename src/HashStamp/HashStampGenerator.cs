@@ -155,36 +155,20 @@ public class HashStampGenerator : IIncrementalGenerator
 
         sb.AppendLine("            };");
         sb.AppendLine();
-        sb.AppendLine("        public readonly struct MethodHash");
+        sb.AppendLine("        public class MethodHash(string hash, string signature)");
         sb.AppendLine("        {");
-        sb.AppendLine("            public readonly string Hash;");
-        sb.AppendLine("            public readonly string Signature;");
-        sb.AppendLine();
-        sb.AppendLine("            public MethodHash(string hash, string signature)");
-        sb.AppendLine("            {");
-        sb.AppendLine("                Hash = hash;");
-        sb.AppendLine("                Signature = signature;");
-        sb.AppendLine("            }");
+        sb.AppendLine("            public string Hash { get; } = hash;");
+        sb.AppendLine("            public string Signature { get; } = signature;");
         sb.AppendLine("        }");
         sb.AppendLine();
-        sb.AppendLine("        public readonly struct ClassHashes");
+        sb.AppendLine("        public class ClassHashes(Dictionary<string, MethodHash> methodHashes)");
         sb.AppendLine("        {");
-        sb.AppendLine("            public readonly Dictionary<string, MethodHash> Methods;");
-        sb.AppendLine();
-        sb.AppendLine("            public ClassHashes(Dictionary<string, MethodHash> methodHashes)");
-        sb.AppendLine("            {");
-        sb.AppendLine("                Methods = methodHashes;");
-        sb.AppendLine("            }");
+        sb.AppendLine("            public Dictionary<string, MethodHash> Methods { get; } = methodHashes;");
         sb.AppendLine("        }");
         sb.AppendLine("        ");
-        sb.AppendLine("        public readonly struct NamespaceHashes");
+        sb.AppendLine("        public class NamespaceHashes(Dictionary<string, ClassHashes> classHashes)");
         sb.AppendLine("        {");
-        sb.AppendLine("            public readonly Dictionary<string, ClassHashes> Classes;");
-        sb.AppendLine();
-        sb.AppendLine("            public NamespaceHashes(Dictionary<string, ClassHashes> classHashes)");
-        sb.AppendLine("            {");
-        sb.AppendLine("                Classes = classHashes;");
-        sb.AppendLine("            }");
+        sb.AppendLine("            public Dictionary<string, ClassHashes> Classes { get; } = classHashes;");
         sb.AppendLine("        }");
         sb.AppendLine("    }");
 
@@ -199,21 +183,16 @@ public class HashStampGenerator : IIncrementalGenerator
     private static string CalculateHash(string source)
     {
         using var sha256 = SHA256.Create();
-        var sourceBytes = Encoding.UTF8.GetBytes(source);
-        var hashBytes = sha256.ComputeHash(sourceBytes);
+        var bytes = Encoding.UTF8.GetBytes(source);
+        var hash = sha256.ComputeHash(bytes);
 
-        // Use a more efficient hex conversion than StringBuilder
-        const string hexLookup = "0123456789abcdef";
-        var result = new char[hashBytes.Length * 2];
-
-        for (int i = 0; i < hashBytes.Length; i++)
+        // Optimize string conversion to avoid multiple string allocations
+        var result = new StringBuilder(hash.Length * 2);
+        foreach (var b in hash)
         {
-            var b = hashBytes[i];
-            result[i * 2] = hexLookup[b >> 4];
-            result[i * 2 + 1] = hexLookup[b & 0xF];
+            result.Append(b.ToString("x2"));
         }
-
-        return new string(result);
+        return result.ToString();
     }
 
     private class MethodHashInfo(string @namespace, string className, string name, string hash, string qualifiedName, string signature)
