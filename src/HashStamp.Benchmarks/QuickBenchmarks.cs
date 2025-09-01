@@ -38,7 +38,7 @@ namespace HashStamp.Benchmarks
         {
             var largeClass = HashStamps.Namespaces["HashStamp.Benchmarks.TestData"]
                 .Classes["LargeTestClass"];
-            
+
             return largeClass.Methods.Values.Select(m => m.Hash).ToArray();
         }
 
@@ -58,7 +58,7 @@ namespace HashStamp.Benchmarks
             // Access same hashes via runtime lookup
             var largeClass = HashStamps.Namespaces["HashStamp.Benchmarks.TestData"]
                 .Classes["LargeTestClass"];
-                
+
             return largeClass.Methods["Method1"].Hash +
                    largeClass.Methods["Method10"].Hash +
                    largeClass.Methods["IntMethod5"].Hash +

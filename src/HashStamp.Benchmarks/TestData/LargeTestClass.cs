@@ -14,19 +14,19 @@ namespace HashStamp.Benchmarks.TestData
         public string Method8() => "Method 8 implementation";
         public string Method9() => "Method 9 implementation";
         public string Method10() => "Method 10 implementation";
-        
+
         public int IntMethod1() { return 1 + 2 + 3; }
         public int IntMethod2() { return 4 + 5 + 6; }
         public int IntMethod3() { return 7 + 8 + 9; }
         public int IntMethod4() { return 10 + 11 + 12; }
         public int IntMethod5() { return 13 + 14 + 15; }
-        
+
         public void VoidMethod1() { Console.WriteLine("Void method 1"); }
         public void VoidMethod2() { Console.WriteLine("Void method 2"); }
         public void VoidMethod3() { Console.WriteLine("Void method 3"); }
         public void VoidMethod4() { Console.WriteLine("Void method 4"); }
         public void VoidMethod5() { Console.WriteLine("Void method 5"); }
-        
+
         public bool BoolMethod1() => true && false;
         public bool BoolMethod2() => false || true;
         public bool BoolMethod3() => !false;
