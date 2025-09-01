@@ -37,9 +37,16 @@ HashStamp is a .NET Roslyn incremental source generator that analyzes source cod
   - **Run time**: ~2 seconds - NEVER CANCEL, set timeout to 30+ seconds
   - **Expected output**: Console application displays "Hello, World!" followed by SHA-256 hash values
 
+- **Run benchmarks**:
+  ```bash
+  dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release -- --quick
+  ```
+  - **Run time**: ~120 seconds maximum - NEVER CANCEL, set timeout to 150+ seconds
+  - **Expected output**: Performance metrics for hash generation and access patterns
+
 - **Unit tests**: No unit tests exist in this repository
   - `dotnet test` completes immediately with no tests found
-  - Primary validation is via running the HashStamp.Test console application
+  - Primary validation is via running the HashStamp.Test console application and benchmarks
 
 ### Code Formatting and Quality
 - **Format code**: `dotnet format .`
@@ -59,13 +66,20 @@ HashStamp is a .NET Roslyn incremental source generator that analyzes source cod
    - Verify the application outputs hash values without errors
    - Confirm no "CS0103: The name 'HashStamps' does not exist" compilation errors
 
-2. **Hash generation verification**:
+2. **Benchmark validation** (for performance-related changes):
+   ```bash
+   dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release -- --quick
+   ```
+   - Verify benchmarks run without errors
+   - Check performance metrics are reasonable
+
+3. **Hash generation verification**:
    - Modify a method body in any test class (e.g., change `"Hello, World!"` to `"Hello, Modified!"`)
    - Rebuild and run the application
    - Verify the corresponding hash value changes
    - Restore the original method body to revert the hash
 
-3. **Code quality validation**:
+4. **Code quality validation**:
    ```bash
    dotnet format --verify-no-changes .
    ```
@@ -105,12 +119,22 @@ HashStamp is a .NET Roslyn incremental source generator that analyzes source cod
 │   ├── HashStamp/                    # Source generator library
 │   │   ├── HashStamp.csproj         # .NET Standard 2.0 project
 │   │   └── HashStampGenerator.cs    # Main generator implementation
-│   └── HashStamp.Test/              # Test console application
-│       ├── HashStamp.Test.csproj    # .NET 8.0 console project
-│       ├── Program.cs               # Test application entry point
-│       ├── TestClass1.cs            # Sample class with methods
-│       ├── TestClass2.cs            # Sample class with methods
-│       └── TestClass2b.cs           # Sample class in different namespace
+│   ├── HashStamp.Test/              # Test console application
+│   │   ├── HashStamp.Test.csproj    # .NET 8.0 console project
+│   │   ├── Program.cs               # Test application entry point
+│   │   ├── TestClass1.cs            # Sample class with methods
+│   │   ├── TestClass2.cs            # Sample class with methods
+│   │   └── TestClass2b.cs           # Sample class in different namespace
+│   └── HashStamp.Benchmarks/        # Performance benchmarking application
+│       ├── HashStamp.Benchmarks.csproj  # .NET 8.0 console project
+│       ├── Program.cs               # Benchmark runner entry point
+│       └── QuickBenchmarks.cs       # Benchmark implementations
+├── .github/
+│   ├── workflows/                   # CI/CD GitHub Actions
+│   │   ├── ci.yml                  # Main CI pipeline
+│   │   ├── performance-diff.yml    # Performance comparison on PRs
+│   │   └── release.yml             # Release validation and automation
+│   └── copilot-instructions.md     # GitHub Copilot configuration
 ├── HashStamp.sln                    # Visual Studio solution file
 ├── README.md                        # Project documentation
 ├── LICENSE                          # MIT license
@@ -121,8 +145,25 @@ HashStamp is a .NET Roslyn incremental source generator that analyzes source cod
 - **HashStampGenerator.cs**: Core source generator logic - changes here require thorough validation
 - **Test classes**: Changes to method bodies should trigger hash regeneration
 - **Project files**: Analyzer references and configurations
+- **Benchmark classes**: Performance test implementations that validate generator efficiency
+- **CI workflows**: GitHub Actions that automate build, test, and release processes
 
 ## Development Workflow
+
+### CI/CD Workflows
+The repository includes automated workflows that validate all changes:
+
+- **CI Pipeline (`.github/workflows/ci.yml`)**: 
+  - Runs on all pushes to `main`/`master` and pull requests
+  - Validates code formatting, builds in Release configuration, runs tests and benchmarks
+  
+- **Performance Diff (`.github/workflows/performance-diff.yml`)**: 
+  - Automatically runs on pull requests to compare performance with base branch
+  - Posts detailed performance analysis as PR comments
+  
+- **Release Validation (`.github/workflows/release.yml`)**:
+  - Validates version increments on PRs to HashStamp.csproj
+  - Automates GitHub releases when version tags are pushed
 
 ### Making Changes
 1. **ALWAYS build first**: `dotnet build` to ensure current state is working
