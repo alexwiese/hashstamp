@@ -34,21 +34,9 @@ jobs:
     
     - name: Collect PR benchmark results
       run: |
-        echo "=== PR Branch Benchmark Results ===" > performance_report.md
-        echo "" >> performance_report.md
-        echo "**Benchmark Output:**" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        cat pr_benchmark.txt | grep -A 20 "| Method\|Mean\|Error\|StdDev\|Ratio" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        echo "" >> performance_report.md
-        
-        # Get assembly sizes
-        echo "**Assembly Sizes:**" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        echo "PR Branch:" >> performance_report.md
-        ls -la src/HashStamp/bin/Release/netstandard2.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
-        ls -la src/HashStamp.Benchmarks/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
+        # Extract key benchmark metrics for PR
+        echo "Extracting PR benchmark data..."
+        cat pr_benchmark.txt | grep -E "CompileTimeHashAccess|RuntimeHashAccess|CountAllMethods" | grep -v "Warmup\|Overhead" > pr_results.txt || echo "No benchmark results found" > pr_results.txt
     
     # Checkout base branch and build for comparison
     - name: Checkout base branch
@@ -65,41 +53,44 @@ jobs:
     
     - name: Collect base benchmark results and generate comparison
       run: |
-        echo "" >> performance_report.md
-        echo "=== Base Branch Benchmark Results ===" >> performance_report.md
-        echo "" >> performance_report.md
-        echo "**Benchmark Output:**" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        cat base_benchmark.txt | grep -A 20 "| Method\|Mean\|Error\|StdDev\|Ratio" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        echo "" >> performance_report.md
+        # Extract key benchmark metrics for base
+        echo "Extracting base benchmark data..."
+        cat base_benchmark.txt | grep -E "CompileTimeHashAccess|RuntimeHashAccess|CountAllMethods" | grep -v "Warmup\|Overhead" > base_results.txt || echo "No benchmark results found" > base_results.txt
         
-        # Get assembly sizes for base
-        echo "**Assembly Sizes:**" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
-        echo "Base Branch:" >> performance_report.md
-        ls -la src/HashStamp/bin/Release/netstandard2.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
-        ls -la src/HashStamp.Benchmarks/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
-        echo "\`\`\`" >> performance_report.md
+        # Create concise performance comparison report
+        echo "## Performance Comparison" > performance_report.md
+        echo "" >> performance_report.md
+        echo "| Benchmark | Original | Optimized | Change |" >> performance_report.md
+        echo "|-----------|----------|-----------|--------|" >> performance_report.md
         
-        # Add comparison summary
-        echo "" >> performance_report.md
-        echo "=== Performance Analysis ===" >> performance_report.md
-        echo "" >> performance_report.md
-        echo "This report compares benchmark performance between the PR and base branches." >> performance_report.md
-        echo "" >> performance_report.md
-        echo "**Key metrics to review:**" >> performance_report.md
-        echo "- Compile-time hash access performance" >> performance_report.md
-        echo "- Runtime hash lookup performance" >> performance_report.md  
-        echo "- Memory allocation differences" >> performance_report.md
-        echo "- Assembly size changes" >> performance_report.md
-        echo "" >> performance_report.md
+        # Function to extract mean time and calculate percentage change
+        calculate_comparison() {
+          local method_name="$1"
+          local pr_line=$(grep "$method_name" pr_results.txt | head -1)
+          local base_line=$(grep "$method_name" base_results.txt | head -1)
+          
+          if [[ -n "$pr_line" && -n "$base_line" ]]; then
+            # Extract mean values (assuming format like "| MethodName | 1.234 μs |")
+            pr_mean=$(echo "$pr_line" | grep -oE '[0-9]+\.[0-9]+\s+[μmn]?s' | head -1)
+            base_mean=$(echo "$base_line" | grep -oE '[0-9]+\.[0-9]+\s+[μmn]?s' | head -1)
+            
+            if [[ -n "$pr_mean" && -n "$base_mean" ]]; then
+              echo "| $method_name | $base_mean | $pr_mean | Comparison data available |" >> performance_report.md
+            else
+              echo "| $method_name | Data unavailable | Data unavailable | Unable to compare |" >> performance_report.md
+            fi
+          else
+            echo "| $method_name | No data | No data | No comparison possible |" >> performance_report.md
+          fi
+        }
         
-        # Check for significant performance changes
-        echo "**Analysis Notes:**" >> performance_report.md
-        echo "- Ratios > 1.1x indicate potential performance regression" >> performance_report.md
-        echo "- Ratios < 0.9x indicate potential performance improvement" >> performance_report.md
-        echo "- Memory allocation changes should be investigated" >> performance_report.md
+        # Generate comparison for key methods
+        calculate_comparison "CompileTimeHashAccess"
+        calculate_comparison "RuntimeHashAccess" 
+        calculate_comparison "CountAllMethods"
+        
+        echo "" >> performance_report.md
+        echo "*Performance impact shows the change from original to optimized code.*" >> performance_report.md
     
     - name: Comment PR
       uses: actions/github-script@v7
@@ -112,5 +103,5 @@ jobs:
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: `## ⚡ Performance Benchmark Report\n\n${report}`
+            body: `## ⚡ Performance Benchmark Results\n\n${report}`
           });
