@@ -70,8 +70,8 @@ jobs:
         # Create concise performance comparison report
         echo "## Performance Comparison" > performance_report.md
         echo "" >> performance_report.md
-        echo "| Benchmark | Original | Optimized | Percentage | Change |" >> performance_report.md
-        echo "|-----------|----------|-----------|------------|--------|" >> performance_report.md
+        echo "| Benchmark | Original | Optimized | Change |" >> performance_report.md
+        echo "|-----------|----------|-----------|--------|" >> performance_report.md
         
         # Function to extract mean time and calculate percentage change
         calculate_comparison() {
@@ -99,33 +99,25 @@ jobs:
               if [[ -n "$pr_value" && -n "$base_value" ]]; then
                 change=$(echo "scale=2; (($pr_value - $base_value) / $base_value) * 100" | bc -l 2>/dev/null || echo "N/A")
                 if [[ "$change" != "N/A" ]]; then
-                  # Format the percentage for display
-                  if (( $(echo "$change >= 0" | bc -l) )); then
-                    percentage_display="+${change}%"
-                  else
-                    percentage_display="${change}%"
-                  fi
-                  
                   if (( $(echo "$change > 0" | bc -l) )); then
-                    change_text="slower"
+                    change_text="+${change}% slower"
                   elif (( $(echo "$change < 0" | bc -l) )); then
-                    change_text="faster"  
+                    change_text="${change}% faster"  
                   else
-                    change_text="no change"
+                    change_text="No change"
                   fi
                 else
-                  percentage_display="N/A"
-                  change_text="unable to calculate"
+                  change_text="Unable to calculate"
                 fi
-                echo "| $method_name | $base_mean | $pr_mean | $percentage_display | $change_text |" >> performance_report.md
+                echo "| $method_name | $base_mean | $pr_mean | $change_text |" >> performance_report.md
               else
-                echo "| $method_name | $base_mean | $pr_mean | N/A | unable to compare |" >> performance_report.md
+                echo "| $method_name | $base_mean | $pr_mean | Unable to compare |" >> performance_report.md
               fi
             else
-              echo "| $method_name | Data unavailable | Data unavailable | N/A | unable to compare |" >> performance_report.md
+              echo "| $method_name | Data unavailable | Data unavailable | Unable to compare |" >> performance_report.md
             fi
           else
-            echo "| $method_name | No data | No data | N/A | no comparison possible |" >> performance_report.md
+            echo "| $method_name | No data | No data | No comparison possible |" >> performance_report.md
           fi
         }
         
