@@ -70,8 +70,8 @@ jobs:
         # Create concise performance comparison report
         echo "## Performance Comparison" > performance_report.md
         echo "" >> performance_report.md
-        echo "| Benchmark | Original | Optimized | Change |" >> performance_report.md
-        echo "|-----------|----------|-----------|--------|" >> performance_report.md
+        echo "| Benchmark | Original | Optimized | Percentage | Change |" >> performance_report.md
+        echo "|-----------|----------|-----------|------------|--------|" >> performance_report.md
         
         # Function to extract mean time and calculate percentage change
         calculate_comparison() {
@@ -99,25 +99,33 @@ jobs:
               if [[ -n "$pr_value" && -n "$base_value" ]]; then
                 change=$(echo "scale=2; (($pr_value - $base_value) / $base_value) * 100" | bc -l 2>/dev/null || echo "N/A")
                 if [[ "$change" != "N/A" ]]; then
-                  if (( $(echo "$change > 0" | bc -l) )); then
-                    change_text="+${change}% slower"
-                  elif (( $(echo "$change < 0" | bc -l) )); then
-                    change_text="${change}% faster"  
+                  # Format the percentage for display
+                  if (( $(echo "$change >= 0" | bc -l) )); then
+                    percentage_display="+${change}%"
                   else
-                    change_text="No change"
+                    percentage_display="${change}%"
+                  fi
+                  
+                  if (( $(echo "$change > 0" | bc -l) )); then
+                    change_text="slower"
+                  elif (( $(echo "$change < 0" | bc -l) )); then
+                    change_text="faster"  
+                  else
+                    change_text="no change"
                   fi
                 else
-                  change_text="Unable to calculate"
+                  percentage_display="N/A"
+                  change_text="unable to calculate"
                 fi
-                echo "| $method_name | $base_mean | $pr_mean | $change_text |" >> performance_report.md
+                echo "| $method_name | $base_mean | $pr_mean | $percentage_display | $change_text |" >> performance_report.md
               else
-                echo "| $method_name | $base_mean | $pr_mean | Unable to compare |" >> performance_report.md
+                echo "| $method_name | $base_mean | $pr_mean | N/A | unable to compare |" >> performance_report.md
               fi
             else
-              echo "| $method_name | Data unavailable | Data unavailable | Unable to compare |" >> performance_report.md
+              echo "| $method_name | Data unavailable | Data unavailable | N/A | unable to compare |" >> performance_report.md
             fi
           else
-            echo "| $method_name | No data | No data | No comparison possible |" >> performance_report.md
+            echo "| $method_name | No data | No data | N/A | no comparison possible |" >> performance_report.md
           fi
         }
         
@@ -139,7 +147,7 @@ jobs:
           const fs = require('fs');
           const report = fs.readFileSync('performance_report.md', 'utf8');
           
-          // First, find and delete any existing performance comments
+          // Find existing performance comments
           const comments = await github.rest.issues.listComments({
             issue_number: context.issue.number,
             owner: context.repo.owner,
@@ -150,21 +158,34 @@ jobs:
             comment.body.includes('⚡ Performance Benchmark Results')
           );
           
-          console.log(`Found ${perfComments.length} existing performance comments`);
+          const commentBody = `## ⚡ Performance Benchmark Results\n\n${report}`;
           
-          for (const comment of perfComments) {
-            console.log(`Deleting existing performance comment ${comment.id}`);
-            await github.rest.issues.deleteComment({
-              comment_id: comment.id,
+          if (perfComments.length > 0) {
+            // Update the first existing performance comment
+            console.log(`Updating existing performance comment ${perfComments[0].id}`);
+            await github.rest.issues.updateComment({
+              comment_id: perfComments[0].id,
               owner: context.repo.owner,
               repo: context.repo.repo,
+              body: commentBody
+            });
+            
+            // Delete any additional performance comments to avoid duplicates
+            for (let i = 1; i < perfComments.length; i++) {
+              console.log(`Deleting duplicate performance comment ${perfComments[i].id}`);
+              await github.rest.issues.deleteComment({
+                comment_id: perfComments[i].id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+            }
+          } else {
+            // Create new performance comment if none exists
+            console.log('Creating new performance comment');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
             });
           }
-          
-          // Create new performance comment
-          await github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `## ⚡ Performance Benchmark Results\n\n${report}`
-          });
