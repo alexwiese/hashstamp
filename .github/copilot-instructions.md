@@ -4,6 +4,10 @@ HashStamp is a .NET Roslyn incremental source generator that analyzes source cod
 
 **Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
 
+## Contributing Guidelines Reference
+
+This repository includes comprehensive contributing guidelines in [CONTRIBUTING.md](../CONTRIBUTING.md) for external contributors. These copilot instructions focus on development workflow and technical details, while CONTRIBUTING.md covers the complete contribution process including PR requirements, community guidelines, and getting started information.
+
 ## Working Effectively
 
 ### Bootstrap and Build
@@ -149,6 +153,8 @@ HashStamp is a .NET Roslyn incremental source generator that analyzes source cod
 - **CI workflows**: GitHub Actions that automate build, test, and release processes
 
 ## Development Workflow
+
+For complete contributor guidelines including PR process, setup instructions, and community standards, see [CONTRIBUTING.md](../CONTRIBUTING.md). The sections below provide technical details for development.
 
 ### CI/CD Workflows
 The repository includes automated workflows that validate all changes:

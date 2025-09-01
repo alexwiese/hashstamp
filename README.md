@@ -157,7 +157,25 @@ The release workflow will automatically validate the tag matches the project ver
 
 ## Contributing
 
-Contributions are welcome! If you have suggestions, bug fixes, or new features to propose, please open an issue or submit a pull request. For detailed contribution guidelines, see our [Contributing Guidelines](CONTRIBUTING.md).
+We welcome contributions from the community! Whether you're fixing bugs, adding features, improving documentation, or reporting issues, your help makes HashStamp better.
+
+📖 **[Read our Contributing Guidelines](CONTRIBUTING.md)** for detailed information on:
+- Development setup and prerequisites  
+- Pull request process and requirements
+- Code standards and formatting guidelines
+- Testing procedures and validation scenarios
+- CI/CD workflow and release process
+
+Quick start for contributors:
+```bash
+# Fork the repo, then clone your fork
+git clone https://github.com/YOUR-USERNAME/hashstamp.git
+cd hashstamp
+dotnet restore && dotnet build
+dotnet run --project src/HashStamp.Test/HashStamp.Test.csproj
+```
+
+For questions or discussions, feel free to open an issue!
 
 ## License
 
