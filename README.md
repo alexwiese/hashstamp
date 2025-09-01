@@ -1,5 +1,10 @@
 # HashStamp
 
+[![CI](https://github.com/alexwiese/hashstamp/actions/workflows/ci.yml/badge.svg)](https://github.com/alexwiese/hashstamp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![.NET](https://img.shields.io/badge/.NET-8.0-blue.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Release](https://img.shields.io/github/v/release/alexwiese/hashstamp)](https://github.com/alexwiese/hashstamp/releases/latest)
+
 **HashStamp** is a lightweight incremental source generator for .NET projects that leverages Roslyn's incremental generator API. It analyzes your source code during the build process and automatically generates unique hash values for each method's body. These hashes can be used for integrity checks, debugging, or any scenario that benefits from a "fingerprint" of your code.
 
 ## Features
