@@ -180,14 +180,14 @@ public class HashStampGenerator : IIncrementalGenerator
 
         // Use char array for better performance than StringBuilder - eliminates intermediate allocations
         var hexChars = new char[hash.Length * 2];
-
+        
         for (int i = 0; i < hash.Length; i++)
         {
             var b = hash[i];
             hexChars[i * 2] = GetHexChar(b >> 4);
             hexChars[i * 2 + 1] = GetHexChar(b & 0xF);
         }
-
+        
         return new string(hexChars);
     }
 
