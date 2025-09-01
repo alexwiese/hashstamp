@@ -1,0 +1,138 @@
+name: Performance Diff
+
+on:
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  performance-diff:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      pull-requests: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    # Build and test current branch (PR)
+    - name: Build current branch
+      run: |
+        echo "Building PR branch..."
+        dotnet build --configuration Release --no-restore
+        echo "Running test application..."
+        time -p dotnet run --project src/HashStamp.Test/HashStamp.Test.csproj --no-build --configuration Release > pr_output.txt 2> pr_timing.txt
+    
+    - name: Collect PR metrics
+      run: |
+        echo "=== PR Branch Metrics ===" > performance_report.md
+        echo "" >> performance_report.md
+        echo "**Build Output:**" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        cat pr_output.txt >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        echo "" >> performance_report.md
+        echo "**Timing Information:**" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        if [ -s pr_timing.txt ]; then
+          cat pr_timing.txt >> performance_report.md
+        else
+          echo "No timing information captured" >> performance_report.md
+        fi
+        echo "\`\`\`" >> performance_report.md
+        echo "" >> performance_report.md
+        
+        # Get assembly sizes
+        echo "**Assembly Sizes:**" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        echo "PR Branch:" >> performance_report.md
+        ls -la src/HashStamp/bin/Release/netstandard2.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
+        ls -la src/HashStamp.Test/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+    
+    # Checkout base branch and build for comparison
+    - name: Checkout base branch
+      run: |
+        git checkout ${{ github.event.pull_request.base.sha }}
+        dotnet restore
+    
+    - name: Build base branch
+      run: |
+        echo "Building base branch..."
+        dotnet build --configuration Release --no-restore
+        echo "Running test application..."
+        time -p dotnet run --project src/HashStamp.Test/HashStamp.Test.csproj --no-build --configuration Release > base_output.txt 2> base_timing.txt
+    
+    - name: Collect base metrics and generate comparison
+      run: |
+        echo "" >> performance_report.md
+        echo "=== Base Branch Metrics ===" >> performance_report.md
+        echo "" >> performance_report.md
+        echo "**Build Output:**" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        cat base_output.txt >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        echo "" >> performance_report.md
+        echo "**Timing Information:**" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        if [ -s base_timing.txt ]; then
+          cat base_timing.txt >> performance_report.md
+        else
+          echo "No timing information captured" >> performance_report.md
+        fi
+        echo "\`\`\`" >> performance_report.md
+        echo "" >> performance_report.md
+        
+        # Get assembly sizes for base
+        echo "**Assembly Sizes:**" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        echo "Base Branch:" >> performance_report.md
+        ls -la src/HashStamp/bin/Release/netstandard2.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
+        ls -la src/HashStamp.Test/bin/Release/net8.0/ | grep "\.dll$" >> performance_report.md || echo "No DLLs found" >> performance_report.md
+        echo "\`\`\`" >> performance_report.md
+        
+        # Add comparison summary
+        echo "" >> performance_report.md
+        echo "=== Summary ===" >> performance_report.md
+        echo "" >> performance_report.md
+        echo "This performance report compares the PR branch against the base branch." >> performance_report.md
+        echo "Key areas to review:" >> performance_report.md
+        echo "- Build output differences (especially hash values)" >> performance_report.md
+        echo "- Assembly size changes" >> performance_report.md
+        echo "- Runtime performance" >> performance_report.md
+        echo "" >> performance_report.md
+        
+        # Check if outputs are different
+        if diff -q pr_output.txt base_output.txt > /dev/null; then
+          echo "✅ **Output is identical between branches**" >> performance_report.md
+        else
+          echo "⚠️ **Output differs between branches**" >> performance_report.md
+          echo "" >> performance_report.md
+          echo "**Differences:**" >> performance_report.md
+          echo "\`\`\`diff" >> performance_report.md
+          diff pr_output.txt base_output.txt >> performance_report.md || true
+          echo "\`\`\`" >> performance_report.md
+        fi
+    
+    - name: Comment PR
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('performance_report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 📊 Performance Diff Report\n\n${report}`
+          });

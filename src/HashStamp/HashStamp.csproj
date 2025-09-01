@@ -13,6 +13,11 @@
     <ROSLYN_VERSION Condition="'$(ROSLYN_VERSION)' == ''">4.8</ROSLYN_VERSION>
 
     <Configurations>Debug;Release;Debug Source Generator</Configurations>
+    
+    <!-- Version information -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
