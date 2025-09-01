@@ -7,7 +7,7 @@
             return "Hello, World!";
         }
 
-        public string TestMethod2(string s= null)
+        public string TestMethod2(string s = null)
         {
             return "Hello, World!";
         }

@@ -180,6 +180,6 @@ public class HashStampGenerator : IIncrementalGenerator
         public string ClassName { get; } = className;
         public string Name { get; } = name;
         public string Hash { get; } = hash;
-        public string QualifiedName { get; } = Regex.Replace(qualifiedName, @"[\(\)\.]", "_").TrimEnd("_").ToString();
+        public string QualifiedName { get; } = Regex.Replace(qualifiedName, @"[\(\)\.]", "_").TrimEnd('_');
     }
 }
