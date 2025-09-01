@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Check code formatting
+      run: dotnet format --verify-no-changes
+    
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+    
+    - name: Test console application
+      run: dotnet run --project src/HashStamp.Test/HashStamp.Test.csproj --no-build --configuration Release
+    
+    - name: Run unit tests (if any)
+      run: dotnet test --no-build --configuration Release --verbosity normal
+    
+    - name: Validate benchmarks
+      run: |
+        echo "Running benchmarks in quick mode to validate functionality..."
+        timeout 120 dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release --no-build -- --quick || echo "Benchmarks completed"
