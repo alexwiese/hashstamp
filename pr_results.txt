@@ -1,3 +1,0 @@
-| CompileTimeHashAccess |  4.274 us |  13.182 us |  38.867 us | 0.3810 us |  1.00 |    0.00 |     736 B |        1.00 |
-| RuntimeHashAccess     | 12.691 us |  38.551 us | 113.670 us | 1.2425 us |  3.42 |    0.50 |     736 B |        1.00 |
-| CountAllMethods       | 39.638 us | 116.624 us | 343.868 us | 4.9600 us | 13.51 |    3.75 |    1048 B |        1.42 |
