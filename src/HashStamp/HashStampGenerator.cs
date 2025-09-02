@@ -178,24 +178,83 @@ public class HashStampGenerator : IIncrementalGenerator
         var bytes = Encoding.UTF8.GetBytes(source);
         var hash = sha256.ComputeHash(bytes);
 
-        // Optimize string conversion to avoid multiple string allocations
-        var result = new StringBuilder(hash.Length * 2);
-        foreach (var b in hash)
+        // Use char array for better performance than StringBuilder - eliminates intermediate allocations
+        var hexChars = new char[hash.Length * 2];
+
+        for (int i = 0; i < hash.Length; i++)
         {
-            result.Append(b.ToString("x2"));
+            var b = hash[i];
+            hexChars[i * 2] = GetHexChar(b >> 4);
+            hexChars[i * 2 + 1] = GetHexChar(b & 0xF);
         }
-        return result.ToString();
+
+        return new string(hexChars);
+    }
+
+    /// <summary>
+    /// Converts a 4-bit value to its lowercase hexadecimal character representation.
+    /// </summary>
+    /// <param name="value">Value from 0-15</param>
+    /// <returns>Hexadecimal character '0'-'9' or 'a'-'f'</returns>
+    private static char GetHexChar(int value)
+    {
+        return (char)(value < 10 ? '0' + value : 'a' + value - 10);
     }
 
     private class MethodHashInfo(string @namespace, string className, string name, string hash, string qualifiedName, string signature)
     {
-        private static readonly Regex QualifiedNameRegex = new(@"[\(\)\.]", RegexOptions.Compiled);
+        private static readonly char[] InvalidChars = { '(', ')', '.' };
 
         public string Namespace { get; } = @namespace;
         public string ClassName { get; } = className;
         public string Name { get; } = name;
         public string Hash { get; } = hash;
-        public string QualifiedName { get; } = QualifiedNameRegex.Replace(qualifiedName, "_").TrimEnd('_');
+        public string QualifiedName { get; } = CleanQualifiedName(qualifiedName);
         public string Signature { get; } = signature;
+
+        /// <summary>
+        /// Optimized method to clean qualified name by replacing invalid characters with underscores
+        /// and removing trailing underscores. Avoids regex for better performance.
+        /// </summary>
+        private static string CleanQualifiedName(string qualifiedName)
+        {
+            if (string.IsNullOrEmpty(qualifiedName))
+                return string.Empty;
+
+            // Use char array for efficient character processing - avoid regex overhead
+            var buffer = new char[qualifiedName.Length];
+
+            int writeIndex = 0;
+            for (int i = 0; i < qualifiedName.Length; i++)
+            {
+                char c = qualifiedName[i];
+                bool isInvalid = false;
+                for (int j = 0; j < InvalidChars.Length; j++)
+                {
+                    if (c == InvalidChars[j])
+                    {
+                        isInvalid = true;
+                        break;
+                    }
+                }
+
+                if (isInvalid)
+                {
+                    buffer[writeIndex++] = '_';
+                }
+                else
+                {
+                    buffer[writeIndex++] = c;
+                }
+            }
+
+            // Remove trailing underscores
+            while (writeIndex > 0 && buffer[writeIndex - 1] == '_')
+            {
+                writeIndex--;
+            }
+
+            return new string(buffer, 0, writeIndex);
+        }
     }
 }

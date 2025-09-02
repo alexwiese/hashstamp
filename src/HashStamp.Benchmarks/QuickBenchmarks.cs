@@ -34,6 +34,34 @@ namespace HashStamp.Benchmarks
         }
 
         [Benchmark]
+        public string[] GetAllHashesFromSingleClass()
+        {
+            var testClass = HashStamps.Namespaces["HashStamp.Benchmarks.TestData"]
+                .Classes["BenchmarkTestClass"];
+
+            return testClass.Methods.Values.Select(m => m.Hash).ToArray();
+        }
+
+        [Benchmark]
+        public bool ContainsSpecificMethod()
+        {
+            return HashStamps.Namespaces["HashStamp.Benchmarks.TestData"]
+                .Classes["BenchmarkTestClass"]
+                .Methods.ContainsKey("SimpleMethod");
+        }
+
+        [Benchmark]
+        public string GetMultipleHashes()
+        {
+            var benchmarkClass = HashStamps.Namespaces["HashStamp.Benchmarks.TestData"]
+                .Classes["BenchmarkTestClass"];
+
+            return benchmarkClass.Methods["SimpleMethod"].Hash +
+                   benchmarkClass.Methods["MethodWithLoops"].Hash +
+                   benchmarkClass.Methods["ComplexMethod"].Hash;
+        }
+
+        [Benchmark]
         public string LargeScaleCompileTimeAccess()
         {
             return HashStamps.HashStamp_Benchmarks_TestData_LargeScale.BenchmarkBusinessClass1.ProcessTransaction;
