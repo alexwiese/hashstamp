@@ -405,3 +405,7 @@ FodyWeavers.xsd
 performance_report.md
 *_benchmark.txt
 *_results.txt
+# Test files
+*.json
+test_*
+BenchmarkDotNet.Artifacts/

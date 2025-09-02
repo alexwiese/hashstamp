@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Exporters;
+using BenchmarkDotNet.Exporters.Json;
 using BenchmarkDotNet.Loggers;
 using System;
 
@@ -12,8 +13,7 @@ namespace HashStamp.Benchmarks
         {
             // Configure BenchmarkDotNet
             var config = ManualConfig.Create(DefaultConfig.Instance)
-                .AddExporter(MarkdownExporter.GitHub) // For GitHub-friendly markdown
-                .AddExporter(HtmlExporter.Default)
+                .AddExporter(JsonExporter.Brief) // Brief JSON export for CI workflows
                 .AddLogger(ConsoleLogger.Default);
 
             if (args.Length > 0 && args[0] == "--quick")

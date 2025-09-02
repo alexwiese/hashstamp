@@ -35,16 +35,20 @@ jobs:
         echo "Building PR branch..."
         dotnet build --configuration Release --no-restore
         echo "Running benchmarks..."
-        dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release --no-build -- --quick 2>&1 | tee pr_benchmark.txt
+        dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release --no-build -- --quick
     
     - name: Collect PR benchmark results
       run: |
-        # Extract key benchmark metrics from summary table for PR
-        echo "Extracting PR benchmark data..."
-        # Look for the summary table and extract the three benchmark methods (only table rows starting with |)
-        grep -A 10 "| Method" pr_benchmark.txt | grep -E "CompileTimeHashAccess|RuntimeHashAccess|CountAllMethods" | grep -E "^\|" > pr_results.txt || echo "No benchmark results found" > pr_results.txt
-        echo "PR results:"
-        cat pr_results.txt
+        # Extract key benchmark metrics from JSON file for PR
+        echo "Extracting PR benchmark data from JSON..."
+        if [ -f "BenchmarkDotNet.Artifacts/results/HashStamp.Benchmarks.QuickBenchmarks-report-brief.json" ]; then
+          cp BenchmarkDotNet.Artifacts/results/HashStamp.Benchmarks.QuickBenchmarks-report-brief.json pr_results.json
+          echo "PR JSON results saved"
+          ls -la pr_results.json
+        else
+          echo "JSON file not found"
+          find . -name "*.json" -type f
+        fi
     
     # Checkout base branch and build for comparison
     - name: Checkout base branch
@@ -57,62 +61,65 @@ jobs:
         echo "Building base branch..."
         dotnet build --configuration Release --no-restore
         echo "Running benchmarks..."
-        dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release --no-build -- --quick 2>&1 | tee base_benchmark.txt
+        dotnet run --project src/HashStamp.Benchmarks/HashStamp.Benchmarks.csproj --configuration Release --no-build -- --quick
     
     - name: Collect base benchmark results and generate comparison
       run: |
-        # Extract key benchmark metrics from summary table for base
-        echo "Extracting base benchmark data..."
-        grep -A 10 "| Method" base_benchmark.txt | grep -E "CompileTimeHashAccess|RuntimeHashAccess|CountAllMethods" | grep -E "^\|" > base_results.txt || echo "No benchmark results found" > base_results.txt
-        echo "Base results:"
-        cat base_results.txt
+        # Extract key benchmark metrics from JSON file for base
+        echo "Extracting base benchmark data from JSON..."
+        if [ -f "BenchmarkDotNet.Artifacts/results/HashStamp.Benchmarks.QuickBenchmarks-report-brief.json" ]; then
+          cp BenchmarkDotNet.Artifacts/results/HashStamp.Benchmarks.QuickBenchmarks-report-brief.json base_results.json
+          echo "Base JSON results saved"
+          ls -la base_results.json
+        else
+          echo "Base JSON file not found"
+          find . -name "*.json" -type f
+        fi
         
-        # Create concise performance comparison report
+        # Install jq for JSON parsing
+        if ! command -v jq &> /dev/null; then
+          echo "Installing jq..."
+          sudo apt-get update && sudo apt-get install -y jq
+        fi
+        
+        # Create concise performance comparison report using JSON data
         echo "## Performance Comparison" > performance_report.md
         echo "" >> performance_report.md
-        echo "| Benchmark | Original | Optimized | Change |" >> performance_report.md
-        echo "|-----------|----------|-----------|--------|" >> performance_report.md
+        echo "| Benchmark | Original (μs) | Optimized (μs) | Change |" >> performance_report.md
+        echo "|-----------|---------------|----------------|--------|" >> performance_report.md
         
-        # Function to extract mean time and calculate percentage change
+        # Function to extract mean time from JSON and calculate percentage change
         calculate_comparison() {
           local method_name="$1"
-          local pr_line=$(grep "$method_name" pr_results.txt | head -1)
-          local base_line=$(grep "$method_name" base_results.txt | head -1)
           
-          echo "Comparing $method_name:"
-          echo "  PR line: $pr_line"
-          echo "  Base line: $base_line"
+          echo "Comparing $method_name..."
           
-          if [[ -n "$pr_line" && -n "$base_line" ]]; then
-            # Extract mean values from summary table (2nd column after method name)
-            # Format: | CompileTimeHashAccess |  4.045 us | ...
-            pr_mean=$(echo "$pr_line" | awk -F'|' '{print $3}' | xargs)
-            base_mean=$(echo "$base_line" | awk -F'|' '{print $3}' | xargs)
+          # Extract mean values from JSON (in nanoseconds, convert to microseconds)
+          if [ -f "pr_results.json" ] && [ -f "base_results.json" ]; then
+            pr_mean_ns=$(jq -r ".Benchmarks[] | select(.Method == \"$method_name\") | .Statistics.Mean" pr_results.json 2>/dev/null)
+            base_mean_ns=$(jq -r ".Benchmarks[] | select(.Method == \"$method_name\") | .Statistics.Mean" base_results.json 2>/dev/null)
             
-            echo "  Extracted - PR: '$pr_mean', Base: '$base_mean'"
+            echo "  Extracted - PR: '$pr_mean_ns' ns, Base: '$base_mean_ns' ns"
             
-            if [[ -n "$pr_mean" && -n "$base_mean" && "$pr_mean" != "No benchmark results found" && "$base_mean" != "No benchmark results found" ]]; then
-              # Calculate percentage change
-              pr_value=$(echo "$pr_mean" | grep -oE '[0-9]+\.?[0-9]*')
-              base_value=$(echo "$base_mean" | grep -oE '[0-9]+\.?[0-9]*')
+            if [[ "$pr_mean_ns" != "null" && "$base_mean_ns" != "null" && -n "$pr_mean_ns" && -n "$base_mean_ns" ]]; then
+              # Convert nanoseconds to microseconds for better readability
+              pr_mean_us=$(echo "scale=3; $pr_mean_ns / 1000" | bc -l)
+              base_mean_us=$(echo "scale=3; $base_mean_ns / 1000" | bc -l)
               
-              if [[ -n "$pr_value" && -n "$base_value" ]]; then
-                change=$(echo "scale=2; (($pr_value - $base_value) / $base_value) * 100" | bc -l 2>/dev/null || echo "N/A")
-                if [[ "$change" != "N/A" ]]; then
-                  if (( $(echo "$change > 0" | bc -l) )); then
-                    change_text="+${change}% slower"
-                  elif (( $(echo "$change < 0" | bc -l) )); then
-                    change_text="${change}% faster"  
-                  else
-                    change_text="No change"
-                  fi
+              # Calculate percentage change
+              change=$(echo "scale=2; (($pr_mean_ns - $base_mean_ns) / $base_mean_ns) * 100" | bc -l 2>/dev/null || echo "N/A")
+              if [[ "$change" != "N/A" ]]; then
+                if (( $(echo "$change > 0" | bc -l) )); then
+                  change_text="+${change}% slower"
+                elif (( $(echo "$change < 0" | bc -l) )); then
+                  change_text="${change}% faster"  
                 else
-                  change_text="Unable to calculate"
+                  change_text="No change"
                 fi
-                echo "| $method_name | $base_mean | $pr_mean | $change_text |" >> performance_report.md
               else
-                echo "| $method_name | $base_mean | $pr_mean | Unable to compare |" >> performance_report.md
+                change_text="Unable to calculate"
               fi
+              echo "| $method_name | ${base_mean_us} | ${pr_mean_us} | $change_text |" >> performance_report.md
             else
               echo "| $method_name | Data unavailable | Data unavailable | Unable to compare |" >> performance_report.md
             fi
@@ -127,7 +134,7 @@ jobs:
         calculate_comparison "CountAllMethods"
         
         echo "" >> performance_report.md
-        echo "*Performance impact shows the change from original to optimized code.*" >> performance_report.md
+        echo "*Performance values are shown in microseconds (μs). Negative change % indicates better performance.*" >> performance_report.md
         
         echo "Final performance report:"
         cat performance_report.md
