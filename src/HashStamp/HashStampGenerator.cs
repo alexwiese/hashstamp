@@ -9,19 +9,19 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace HashStamp;
 
 /// <summary>
 /// HashStamp incremental source generator that creates hash values for method bodies.
 /// 
-/// This generator has been refactored to use Roslyn APIs instead of string-based generation:
-/// 1. Method body extraction now uses Roslyn syntax tree traversal instead of ToFullString()
-/// 2. Code generation now uses SyntaxFactory APIs instead of string concatenation
+/// This generator has been enhanced to use Roslyn APIs for method body extraction:
+/// - Method body extraction now uses Roslyn syntax tree traversal instead of ToFullString()
+/// - Code generation continues to use the proven string-based approach for reliability
 /// 
-/// The refactoring improves maintainability and provides better control over the generated syntax.
+/// The enhanced method body extraction improves accuracy while maintaining stable code generation.
 /// </summary>
+
 [Generator]
 public class HashStampGenerator : IIncrementalGenerator
 {
@@ -54,28 +54,31 @@ public class HashStampGenerator : IIncrementalGenerator
             if (methodSymbol is null)
                 continue;
 
-            // Get the source code of the method's body using Roslyn APIs instead of string conversion
-            // For expression-bodied methods we need to use the ExpressionBody
+            // Get the source code of the method's body using enhanced Roslyn APIs instead of string conversion
+            // This provides more precise method body extraction for better hashing accuracy
             var methodBodyContent = ExtractMethodBodyContent(method);
 
             var hash = CalculateHash(methodBodyContent);
+
+            var qualifiedName = methodSymbol.ToDisplayString(new SymbolDisplayFormat(
+                memberOptions: SymbolDisplayMemberOptions.IncludeParameters,
+                parameterOptions: SymbolDisplayParameterOptions.IncludeType));
 
             methodHashes.Add(new(
                 @namespace: methodSymbol.ContainingNamespace.ToDisplayString(),
                 className: methodSymbol.ContainingType.Name,
                 name: methodSymbol.ToDisplayString(new SymbolDisplayFormat()),
-                qualifiedName: methodSymbol.ToDisplayString(new SymbolDisplayFormat(
-                    memberOptions: SymbolDisplayMemberOptions.IncludeParameters,
-                    parameterOptions: SymbolDisplayParameterOptions.IncludeType)),
-                hash: hash));
+                qualifiedName: qualifiedName,
+                hash: hash,
+                signature: qualifiedName));
         }
 
-        context.AddSource($"HashStamps.g.cs", GenerateHashStampsWithRoslynApis(methodHashes));
+        context.AddSource($"HashStamps.g.cs", GenerateHashStamps(methodHashes));
     }
 
     /// <summary>
-    /// Extracts method body content using Roslyn syntax APIs instead of ToFullString().
-    /// This provides a more precise way to get the method content for hashing.
+    /// Extracts method body content using enhanced Roslyn syntax APIs instead of ToFullString().
+    /// This provides more precise method body extraction for consistent hashing.
     /// </summary>
     /// <param name="method">The method declaration syntax node</param>
     /// <returns>The normalized method body content</returns>
@@ -83,13 +86,13 @@ public class HashStampGenerator : IIncrementalGenerator
     {
         if (method.Body != null)
         {
-            // For block-bodied methods, extract the content from the block
+            // For block-bodied methods, extract content using syntax tree traversal
             return ExtractBlockContent(method.Body);
         }
         
         if (method.ExpressionBody != null)
         {
-            // For expression-bodied methods, extract the expression content
+            // For expression-bodied methods, extract expression content
             return ExtractExpressionContent(method.ExpressionBody);
         }
         
@@ -97,8 +100,7 @@ public class HashStampGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Extracts content from a block syntax using Roslyn APIs
-    /// This traverses the syntax tree instead of using ToFullString() for more precise extraction
+    /// Extracts content from a block syntax using Roslyn APIs for better precision
     /// </summary>
     private static string ExtractBlockContent(BlockSyntax block)
     {
@@ -106,7 +108,7 @@ public class HashStampGenerator : IIncrementalGenerator
         
         foreach (var statement in block.Statements)
         {
-            // Use syntax tree traversal instead of ToFullString()
+            // Use normalized syntax instead of raw ToFullString()
             contentBuilder.AppendLine(NormalizeSyntaxNode(statement));
         }
         
@@ -118,308 +120,117 @@ public class HashStampGenerator : IIncrementalGenerator
     /// </summary>
     private static string ExtractExpressionContent(ArrowExpressionClauseSyntax expressionBody)
     {
-        // Extract the expression part using syntax traversal
+        // Extract the expression part using syntax normalization
         return NormalizeSyntaxNode(expressionBody.Expression);
     }
 
     /// <summary>
-    /// Normalizes a syntax node by removing unnecessary whitespace and formatting
-    /// This provides consistent hashing regardless of formatting differences
+    /// Normalizes a syntax node to provide consistent formatting for hashing
     /// </summary>
     private static string NormalizeSyntaxNode(SyntaxNode node)
     {
-        // Use NormalizeWhitespace() to get consistent formatting
-        // This is still using Roslyn APIs instead of raw string manipulation
+        // Use Roslyn's NormalizeWhitespace for consistent formatting
         return node.NormalizeWhitespace().ToFullString().Trim();
     }
 
-    /// <summary>
-    /// Generates the HashStamps class using Roslyn SyntaxFactory APIs instead of string concatenation.
-    /// </summary>
-    /// <param name="methodHashes">List of method hash information</param>
-    /// <returns>The generated source code as a string</returns>
-    private static string GenerateHashStampsWithRoslynApis(List<MethodHashInfo> methodHashes)
+    private static string GenerateHashStamps(List<MethodHashInfo> methodHashes)
     {
-        // Create the compilation unit using SyntaxFactory
-        var compilationUnit = CompilationUnit()
-            .AddUsings(
-                UsingDirective(IdentifierName("System.Collections.ObjectModel"))
-            )
-            .AddMembers(
-                // Create the namespace
-                NamespaceDeclaration(IdentifierName("HashStamp"))
-                    .AddMembers(CreateHashStampsClass(methodHashes))
-            )
-            .WithLeadingTrivia(Comment("// <auto-generated/>"))
-            .NormalizeWhitespace();
-
-        return compilationUnit.ToFullString();
-    }
-
-    /// <summary>
-    /// Creates the main HashStamps class using SyntaxFactory
-    /// </summary>
-    private static ClassDeclarationSyntax CreateHashStampsClass(List<MethodHashInfo> methodHashes)
-    {
-        var classDeclaration = ClassDeclaration("HashStamps")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.PartialKeyword));
-
-        // Add namespace classes
-        var namespaceGroups = methodHashes.GroupBy(m => m.Namespace);
-        foreach (var namespaceGroup in namespaceGroups)
+        static string GenerateNamespace(string @namespace, List<MethodHashInfo> methods)
         {
-            classDeclaration = classDeclaration.AddMembers(
-                CreateNamespaceClass(namespaceGroup.Key, namespaceGroup.ToList())
-            );
+            static IEnumerable<MethodHashInfo> GetQualifiedHashes(IEnumerable<MethodHashInfo> methodHashes)
+            {
+                var methodsWithCollidingName = methodHashes
+                  .GroupBy(m => m.Name)
+                  .Where(g => g.Count() > 1)
+                  .Select(g => g.Key)
+                  .ToImmutableHashSet();
+
+                string GetMethodName(MethodHashInfo methodHashInfo)
+                    => methodsWithCollidingName.Contains(methodHashInfo.Name)
+                        ? methodHashInfo.QualifiedName
+                        : methodHashInfo.Name;
+
+                foreach (var methodHash in methodHashes)
+                {
+                    yield return new MethodHashInfo(
+                        @namespace: methodHash.Namespace,
+                        className: methodHash.ClassName,
+                        name: GetMethodName(methodHash),
+                        hash: methodHash.Hash,
+                        qualifiedName: methodHash.QualifiedName,
+                        signature: methodHash.Signature);
+                }
+            }
+
+
+            var classConsts = methods
+                .GroupBy(m => m.ClassName)
+                .Select(m => GenerateClass(m.Key, [.. GetQualifiedHashes(m)]))
+                .ToList();
+
+            return $@"
+                public partial class {@namespace.Replace(".", "_")}
+                {{
+                    {string.Join("\r\n", classConsts)}
+                }}
+            ";
         }
 
-        // Add the Namespaces property and supporting classes
-        classDeclaration = classDeclaration.AddMembers(
-            CreateNamespacesProperty(methodHashes),
-            CreateClassHashesClass(),
-            CreateMethodHashClass(),
-            CreateNamespaceHashesClass()
-        );
-
-        return classDeclaration;
-    }
-
-    /// <summary>
-    /// Creates a namespace class (e.g., HashStamp_Test) using SyntaxFactory
-    /// </summary>
-    private static ClassDeclarationSyntax CreateNamespaceClass(string namespaceName, List<MethodHashInfo> methods)
-    {
-        var className = namespaceName.Replace(".", "_");
-        var classDeclaration = ClassDeclaration(className)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.PartialKeyword));
-
-        // Group by class name
-        var classGroups = methods.GroupBy(m => m.ClassName);
-        foreach (var classGroup in classGroups)
+        static string GenerateClass(string className, List<MethodHashInfo> methods)
         {
-            classDeclaration = classDeclaration.AddMembers(
-                CreateMethodsClass(classGroup.Key, classGroup.ToList())
-            );
+            var methodHashConsts = methods
+                .Select(m => $"public const string {m.Name} = \"{m.Hash}\";")
+                .ToList();
+
+            return $@"
+                public partial class {className}
+                {{
+                    {string.Join("\r\n", methodHashConsts)}
+                }}
+            ";
         }
 
-        return classDeclaration;
-    }
+        var classes = methodHashes
+            .GroupBy(m => m.Namespace)
+            .Select(g => GenerateNamespace(g.Key, [.. g]))
+            .ToList();
 
-    /// <summary>
-    /// Creates a methods class (e.g., TestClass1) containing hash constants
-    /// </summary>
-    private static ClassDeclarationSyntax CreateMethodsClass(string className, List<MethodHashInfo> methods)
-    {
-        var classDeclaration = ClassDeclaration(className)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.PartialKeyword));
+        return $@"
+        // <auto-generated/>
+        using System.Collections.Generic;
+        using System.Collections.ObjectModel;
 
-        // Handle method name collisions
-        var qualifiedHashes = GetQualifiedHashes(methods);
+        namespace HashStamp;
 
-        foreach (var methodHash in qualifiedHashes)
-        {
-            var fieldDeclaration = FieldDeclaration(
-                VariableDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)))
-                    .AddVariables(
-                        VariableDeclarator(methodHash.Name)
-                            .WithInitializer(EqualsValueClause(
-                                LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(methodHash.Hash))
-                            ))
-                    )
-            )
-            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.ConstKeyword));
+        public static partial class HashStamps
+        {{
+            {string.Join("\r\n\t", classes)}
 
-            classDeclaration = classDeclaration.AddMembers(fieldDeclaration);
-        }
+            public static Dictionary<string, NamespaceHashes> Namespaces {{ get; }} = new() {{
+                {string.Join("\r\n", methodHashes.GroupBy(h => h.Namespace).Select(nh => $@"[""{nh.Key}""] = new(new() {{
+                    {string.Join("\r\n\t\t\t\t\t", nh.GroupBy(h => h.ClassName).Select(ch => $@"[""{ch.Key}""] = new(new() {{
+                        {string.Join("\r\n\t\t\t\t\t\t", ch.Select(mhi => $@"[""{mhi.Name}""] = new MethodHash(""{mhi.Hash}"", ""{mhi.Signature}""),"))}
+                    }}),"))}
+                }}),"))}
+            }};
 
-        return classDeclaration;
-    }
+        public class ClassHashes(Dictionary<string, MethodHash> methodHashes)
+        {{
+            public Dictionary<string, MethodHash> Methods {{ get; }} = methodHashes;
+        }}
 
-    /// <summary>
-    /// Creates the Namespaces property using SyntaxFactory
-    /// </summary>
-    private static PropertyDeclarationSyntax CreateNamespacesProperty(List<MethodHashInfo> methodHashes)
-    {
-        // For simplicity, create an empty dictionary initialization
-        // In a real implementation, this would be populated with the actual data
-        // This demonstrates the Roslyn API approach vs string concatenation
+        public class MethodHash(string hash, string signature)
+        {{
+            public string Hash {{ get; }} = hash;
+            public string Signature {{ get; }} = signature;
+        }}
         
-        return PropertyDeclaration(
-                GenericName("Dictionary")
-                    .AddTypeArgumentListArguments(
-                        PredefinedType(Token(SyntaxKind.StringKeyword)),
-                        IdentifierName("NamespaceHashes")
-                    ),
-                "Namespaces"
-            )
-            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
-            .WithAccessorList(AccessorList(SingletonList(
-                AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
-                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            )))
-            .WithInitializer(EqualsValueClause(
-                ObjectCreationExpression(GenericName("Dictionary")
-                    .AddTypeArgumentListArguments(
-                        PredefinedType(Token(SyntaxKind.StringKeyword)),
-                        IdentifierName("NamespaceHashes")
-                    ))
-                .WithArgumentList(ArgumentList())
-            ))
-            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-    }
-
-    /// <summary>
-    /// Creates the ClassHashes class using SyntaxFactory
-    /// </summary>
-    private static ClassDeclarationSyntax CreateClassHashesClass()
-    {
-        // Create constructor
-        var constructor = ConstructorDeclaration("ClassHashes")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(
-                Parameter(Identifier("methodHashes"))
-                    .WithType(GenericName("Dictionary")
-                        .AddTypeArgumentListArguments(
-                            PredefinedType(Token(SyntaxKind.StringKeyword)),
-                            IdentifierName("MethodHash")
-                        ))
-            )
-            .WithBody(Block(
-                ExpressionStatement(
-                    AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                        IdentifierName("Methods"),
-                        IdentifierName("methodHashes")
-                    )
-                )
-            ));
-
-        return ClassDeclaration("ClassHashes")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddMembers(
-                constructor,
-                PropertyDeclaration(
-                    GenericName("Dictionary")
-                        .AddTypeArgumentListArguments(
-                            PredefinedType(Token(SyntaxKind.StringKeyword)),
-                            IdentifierName("MethodHash")
-                        ),
-                    "Methods"
-                )
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .WithAccessorList(AccessorList(SingletonList(
-                    AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
-                        .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                )))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            );
-    }
-
-    /// <summary>
-    /// Creates the MethodHash class using SyntaxFactory
-    /// </summary>
-    private static ClassDeclarationSyntax CreateMethodHashClass()
-    {
-        // Create constructor
-        var constructor = ConstructorDeclaration("MethodHash")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(
-                Parameter(Identifier("hash"))
-                    .WithType(PredefinedType(Token(SyntaxKind.StringKeyword)))
-            )
-            .WithBody(Block(
-                ExpressionStatement(
-                    AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                        IdentifierName("Hash"),
-                        IdentifierName("hash")
-                    )
-                )
-            ));
-
-        return ClassDeclaration("MethodHash")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddMembers(
-                constructor,
-                PropertyDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "Hash")
-                    .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                    .WithAccessorList(AccessorList(SingletonList(
-                        AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
-                            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                    )))
-                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            );
-    }
-
-    /// <summary>
-    /// Creates the NamespaceHashes class using SyntaxFactory
-    /// </summary>
-    private static ClassDeclarationSyntax CreateNamespaceHashesClass()
-    {
-        // Create constructor
-        var constructor = ConstructorDeclaration("NamespaceHashes")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddParameterListParameters(
-                Parameter(Identifier("classHashes"))
-                    .WithType(GenericName("Dictionary")
-                        .AddTypeArgumentListArguments(
-                            PredefinedType(Token(SyntaxKind.StringKeyword)),
-                            IdentifierName("ClassHashes")
-                        ))
-            )
-            .WithBody(Block(
-                ExpressionStatement(
-                    AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                        IdentifierName("Classes"),
-                        IdentifierName("classHashes")
-                    )
-                )
-            ));
-
-        return ClassDeclaration("NamespaceHashes")
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
-            .AddMembers(
-                constructor,
-                PropertyDeclaration(
-                    GenericName("Dictionary")
-                        .AddTypeArgumentListArguments(
-                            PredefinedType(Token(SyntaxKind.StringKeyword)),
-                            IdentifierName("ClassHashes")
-                        ),
-                    "Classes"
-                )
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .WithAccessorList(AccessorList(SingletonList(
-                    AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
-                        .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                )))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            );
-    }
-
-    /// <summary>
-    /// Handles method name collisions by using qualified names when necessary
-    /// </summary>
-    private static IEnumerable<MethodHashInfo> GetQualifiedHashes(IEnumerable<MethodHashInfo> methodHashes)
-    {
-        var methodsWithCollidingName = methodHashes
-          .GroupBy(m => m.Name)
-          .Where(g => g.Count() > 1)
-          .Select(g => g.Key)
-          .ToImmutableHashSet();
-
-        string GetMethodName(MethodHashInfo methodHashInfo)
-            => methodsWithCollidingName.Contains(methodHashInfo.Name)
-                ? methodHashInfo.QualifiedName
-                : methodHashInfo.Name;
-
-        foreach (var methodHash in methodHashes)
-        {
-            yield return new MethodHashInfo(
-                @namespace: methodHash.Namespace,
-                className: methodHash.ClassName,
-                name: GetMethodName(methodHash),
-                hash: methodHash.Hash,
-                qualifiedName: methodHash.QualifiedName);
-        }
+        public class NamespaceHashes(Dictionary<string, ClassHashes> classHashes)
+        {{
+            public Dictionary<string, ClassHashes> Classes {{ get; }} = classHashes;
+        }}
+    }}
+        ";
     }
 
     /// <summary>
@@ -432,15 +243,84 @@ public class HashStampGenerator : IIncrementalGenerator
         using var sha256 = SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(source);
         var hash = sha256.ComputeHash(bytes);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+
+        // Use char array for better performance than StringBuilder - eliminates intermediate allocations
+        var hexChars = new char[hash.Length * 2];
+
+        for (int i = 0; i < hash.Length; i++)
+        {
+            var b = hash[i];
+            hexChars[i * 2] = GetHexChar(b >> 4);
+            hexChars[i * 2 + 1] = GetHexChar(b & 0xF);
+        }
+
+        return new string(hexChars);
     }
 
-    private class MethodHashInfo(string @namespace, string className, string name, string hash, string qualifiedName)
+    /// <summary>
+    /// Converts a 4-bit value to its lowercase hexadecimal character representation.
+    /// </summary>
+    /// <param name="value">Value from 0-15</param>
+    /// <returns>Hexadecimal character '0'-'9' or 'a'-'f'</returns>
+    private static char GetHexChar(int value)
     {
+        return (char)(value < 10 ? '0' + value : 'a' + value - 10);
+    }
+
+    private class MethodHashInfo(string @namespace, string className, string name, string hash, string qualifiedName, string signature)
+    {
+        private static readonly char[] InvalidChars = { '(', ')', '.' };
+
         public string Namespace { get; } = @namespace;
         public string ClassName { get; } = className;
         public string Name { get; } = name;
         public string Hash { get; } = hash;
-        public string QualifiedName { get; } = Regex.Replace(qualifiedName, @"[\(\)\.]", "_").TrimEnd('_');
+        public string QualifiedName { get; } = CleanQualifiedName(qualifiedName);
+        public string Signature { get; } = signature;
+
+        /// <summary>
+        /// Optimized method to clean qualified name by replacing invalid characters with underscores
+        /// and removing trailing underscores. Avoids regex for better performance.
+        /// </summary>
+        private static string CleanQualifiedName(string qualifiedName)
+        {
+            if (string.IsNullOrEmpty(qualifiedName))
+                return string.Empty;
+
+            // Use char array for efficient character processing - avoid regex overhead
+            var buffer = new char[qualifiedName.Length];
+
+            int writeIndex = 0;
+            for (int i = 0; i < qualifiedName.Length; i++)
+            {
+                char c = qualifiedName[i];
+                bool isInvalid = false;
+                for (int j = 0; j < InvalidChars.Length; j++)
+                {
+                    if (c == InvalidChars[j])
+                    {
+                        isInvalid = true;
+                        break;
+                    }
+                }
+
+                if (isInvalid)
+                {
+                    buffer[writeIndex++] = '_';
+                }
+                else
+                {
+                    buffer[writeIndex++] = c;
+                }
+            }
+
+            // Remove trailing underscores
+            while (writeIndex > 0 && buffer[writeIndex - 1] == '_')
+            {
+                writeIndex--;
+            }
+
+            return new string(buffer, 0, writeIndex);
+        }
     }
 }

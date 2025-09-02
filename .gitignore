@@ -398,3 +398,10 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Performance testing temporary files
+*_output.txt
+*_timing.txt
+performance_report.md
+*_benchmark.txt
+*_results.txt
