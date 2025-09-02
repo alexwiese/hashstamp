@@ -1,12 +1,13 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
+using BenchmarkDotNet.Exporters.Json;
 using System.Linq;
 
 namespace HashStamp.Benchmarks
 {
     [SimpleJob(RunStrategy.ColdStart)]
     [MemoryDiagnoser]
-    [MarkdownExporter]
+    [JsonExporter(indentJson: true, excludeMeasurements: true)]
     public class QuickBenchmarks
     {
         [Benchmark(Baseline = true)]
