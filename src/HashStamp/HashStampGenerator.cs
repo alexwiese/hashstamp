@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
@@ -10,6 +11,16 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 namespace HashStamp;
+
+/// <summary>
+/// HashStamp incremental source generator that creates hash values for method bodies.
+/// 
+/// This generator has been enhanced to use Roslyn APIs for method body extraction:
+/// - Method body extraction now uses Roslyn syntax tree traversal instead of ToFullString()
+/// - Code generation continues to use the proven string-based approach for reliability
+/// 
+/// The enhanced method body extraction improves accuracy while maintaining stable code generation.
+/// </summary>
 
 [Generator]
 public class HashStampGenerator : IIncrementalGenerator
@@ -43,13 +54,11 @@ public class HashStampGenerator : IIncrementalGenerator
             if (methodSymbol is null)
                 continue;
 
-            // Get the source code of the method's body, without the signature
-            // For expression-bodied methods we need to use the ExpressionBody
-            var methodBody = method.Body?.ToFullString()
-                ?? method.ExpressionBody?.ToFullString()
-                ?? string.Empty;
+            // Get the source code of the method's body using enhanced Roslyn APIs instead of string conversion
+            // This provides more precise method body extraction for better hashing accuracy
+            var methodBodyContent = ExtractMethodBodyContent(method);
 
-            var hash = CalculateHash(methodBody);
+            var hash = CalculateHash(methodBodyContent);
 
             var qualifiedName = methodSymbol.ToDisplayString(new SymbolDisplayFormat(
                 memberOptions: SymbolDisplayMemberOptions.IncludeParameters,
@@ -65,6 +74,63 @@ public class HashStampGenerator : IIncrementalGenerator
         }
 
         context.AddSource($"HashStamps.g.cs", GenerateHashStamps(methodHashes));
+    }
+
+    /// <summary>
+    /// Extracts method body content using enhanced Roslyn syntax APIs instead of ToFullString().
+    /// This provides more precise method body extraction for consistent hashing.
+    /// </summary>
+    /// <param name="method">The method declaration syntax node</param>
+    /// <returns>The normalized method body content</returns>
+    private static string ExtractMethodBodyContent(MethodDeclarationSyntax method)
+    {
+        if (method.Body != null)
+        {
+            // For block-bodied methods, extract content using syntax tree traversal
+            return ExtractBlockContent(method.Body);
+        }
+
+        if (method.ExpressionBody != null)
+        {
+            // For expression-bodied methods, extract expression content
+            return ExtractExpressionContent(method.ExpressionBody);
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Extracts content from a block syntax using Roslyn APIs for better precision
+    /// </summary>
+    private static string ExtractBlockContent(BlockSyntax block)
+    {
+        var contentBuilder = new StringBuilder();
+
+        foreach (var statement in block.Statements)
+        {
+            // Use normalized syntax instead of raw ToFullString()
+            contentBuilder.AppendLine(NormalizeSyntaxNode(statement));
+        }
+
+        return contentBuilder.ToString();
+    }
+
+    /// <summary>
+    /// Extracts content from an expression body using Roslyn APIs
+    /// </summary>
+    private static string ExtractExpressionContent(ArrowExpressionClauseSyntax expressionBody)
+    {
+        // Extract the expression part using syntax normalization
+        return NormalizeSyntaxNode(expressionBody.Expression);
+    }
+
+    /// <summary>
+    /// Normalizes a syntax node to provide consistent formatting for hashing
+    /// </summary>
+    private static string NormalizeSyntaxNode(SyntaxNode node)
+    {
+        // Use Roslyn's NormalizeWhitespace for consistent formatting
+        return node.NormalizeWhitespace().ToFullString().Trim();
     }
 
     private static string GenerateHashStamps(List<MethodHashInfo> methodHashes)
