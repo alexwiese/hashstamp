@@ -89,13 +89,13 @@ public class HashStampGenerator : IIncrementalGenerator
             // For block-bodied methods, extract content using syntax tree traversal
             return ExtractBlockContent(method.Body);
         }
-        
+
         if (method.ExpressionBody != null)
         {
             // For expression-bodied methods, extract expression content
             return ExtractExpressionContent(method.ExpressionBody);
         }
-        
+
         return string.Empty;
     }
 
@@ -105,13 +105,13 @@ public class HashStampGenerator : IIncrementalGenerator
     private static string ExtractBlockContent(BlockSyntax block)
     {
         var contentBuilder = new StringBuilder();
-        
+
         foreach (var statement in block.Statements)
         {
             // Use normalized syntax instead of raw ToFullString()
             contentBuilder.AppendLine(NormalizeSyntaxNode(statement));
         }
-        
+
         return contentBuilder.ToString();
     }
 
